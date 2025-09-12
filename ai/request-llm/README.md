@@ -1,8 +1,40 @@
-# Anthropic Claude with Go
+# CRD Documentation Analysis Tool
 
-A simple Go project demonstrating how to use Anthropic's Claude AI model directly with the official Go SDK.
+An AI-powered tool that analyzes Custom Resource Definition (CRD) changes and automatically identifies OpenShift documentation files that need updates. Built with Go and Anthropic's Claude AI model.
 
-**Note**: This project was originally intended to use LangChainGo, but we discovered model identifier compatibility issues with LangChain. The official Anthropic SDK provides more reliable access to Claude models.
+## 🚀 Key Features
+
+- **🎯 CRD Change Detection**: Automatically detects changes in `config/crd/bases/` directory
+- **🔍 Smart Documentation Search**: Searches OpenShift documentation for relevant files  
+- **🤖 AI-Powered Analysis**: Uses Claude to provide specific recommendations
+- **✅ Verified URLs**: Returns only real, existing documentation URLs
+- **⚡ GitHub Integration**: Runs automatically on PRs with non-blocking analysis
+
+## 🔄 GitHub Workflow Integration
+
+This tool is integrated with GitHub Actions to provide automatic documentation analysis on pull requests. When you modify CRD files, the workflow:
+
+1. Automatically runs on PRs that change CRD files
+2. Analyzes the specific changes using AI
+3. Searches OpenShift docs for potentially impacted files  
+4. Posts detailed recommendations as PR comments
+5. Provides verified URLs for documentation updates
+
+**See [GITHUB_INTEGRATION.md](GITHUB_INTEGRATION.md) for complete setup instructions.**
+
+### 🧪 Quick Test
+
+To test the GitHub workflow locally:
+
+```bash
+cd ai/request-llm
+export ANTHROPIC_API_KEY="your-api-key"
+./test-workflow.sh
+```
+
+## 🛠️ What This Tool Does
+
+This project demonstrates advanced integration between git analysis, AI processing, and documentation management. It was originally intended to use LangChainGo, but we discovered model identifier compatibility issues. The official Anthropic SDK provides more reliable access to Claude models.
 
 ## Prerequisites
 

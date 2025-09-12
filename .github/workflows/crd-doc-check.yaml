@@ -1,0 +1,202 @@
+name: CRD Documentation Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'config/crd/bases/**'
+      - 'api/**/v1/**'
+      - 'docs/**'
+      - 'ai/request-llm/**'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  crd-doc-check:
+    name: Check CRD Documentation Impact
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          # Need full history to compare with base branch
+          fetch-depth: 0
+          # Ensure we have both branches for comparison
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Setup git for comparison
+        run: |
+          git config --global user.email "action@github.com"
+          git config --global user.name "GitHub Action"
+          # Ensure we have the base branch for comparison
+          git fetch origin ${{ github.event.pull_request.base.ref }}:${{ github.event.pull_request.base.ref }}
+          echo "Base branch: ${{ github.event.pull_request.base.ref }}"
+          echo "Head branch: ${{ github.event.pull_request.head.ref }}"
+          echo "Commits in PR: $(git rev-list --count origin/${{ github.event.pull_request.base.ref }}..${{ github.event.pull_request.head.sha }})"
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Install dependencies
+        run: |
+          cd ai/request-llm
+          go mod tidy
+
+      - name: Run CRD Documentation Analysis
+        id: doc-check
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_ACTIONS: true
+          GITHUB_BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          cd ai/request-llm
+
+          # Capture the output and exit code
+          set +e
+          output=$(go run main.go 2>&1)
+          exit_code=$?
+          set -e
+
+          echo "Exit code: $exit_code"
+          echo "Output length: ${#output}"
+
+          # Save output to file for processing
+          echo "$output" > /tmp/crd-analysis.txt
+
+          # Set outputs for next step
+          echo "exit_code=$exit_code" >> $GITHUB_OUTPUT
+
+          # Check if we have meaningful output
+          if [[ $exit_code -eq 0 && ${#output} -gt 100 ]]; then
+            echo "has_results=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_results=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Process Analysis Results
+        id: process-results
+        if: steps.doc-check.outputs.has_results == 'true'
+        run: |
+          # Extract key information from the analysis
+          analysis_file="/tmp/crd-analysis.txt"
+
+          # Extract the summary section
+          if grep -q "SUMMARY -" "$analysis_file"; then
+            echo "📋 **CRD Documentation Impact Analysis**" > /tmp/comment.md
+            echo "" >> /tmp/comment.md
+            echo "Based on the CRD changes in this PR, here are the documentation files that may need updates:" >> /tmp/comment.md
+            echo "" >> /tmp/comment.md
+
+            # Extract URLs from the summary
+            if grep -A 20 "SUMMARY -" "$analysis_file" | grep -E "https://github.com/openshift/openshift-docs" > /tmp/urls.txt; then
+              echo "🎯 **Documentation Files to Review:**" >> /tmp/comment.md
+              echo "" >> /tmp/comment.md
+              cat /tmp/urls.txt | while read -r url; do
+                if [[ -n "$url" && "$url" =~ ^[0-9]+\. ]]; then
+                  echo "$url" >> /tmp/comment.md
+                fi
+              done
+              echo "" >> /tmp/comment.md
+            fi
+
+            # Extract Claude's specific recommendations
+            if grep -A 50 "Claude's response:" "$analysis_file" | grep -B 50 "SUMMARY -" | head -n -1 > /tmp/recommendations.txt; then
+              echo "🤖 **AI Analysis Results:**" >> /tmp/comment.md
+              echo "" >> /tmp/comment.md
+              echo '```' >> /tmp/comment.md
+              head -n 30 /tmp/recommendations.txt >> /tmp/comment.md
+              if [[ $(wc -l < /tmp/recommendations.txt) -gt 30 ]]; then
+                echo "... (truncated for readability)" >> /tmp/comment.md
+              fi
+              echo '```' >> /tmp/comment.md
+              echo "" >> /tmp/comment.md
+            fi
+
+            # Add footer
+            echo "---" >> /tmp/comment.md
+            echo "⚠️ **Note:** This is a non-blocking check. The analysis is powered by AI and may suggest files that don't require changes." >> /tmp/comment.md
+            echo "📝 Please review the suggested files and update documentation as needed." >> /tmp/comment.md
+            echo "🔍 **How this works:** The tool analyzes CRD changes and searches OpenShift documentation for potentially impacted files." >> /tmp/comment.md
+
+            echo "has_comment=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_comment=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Comment on PR
+        if: steps.process-results.outputs.has_comment == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const comment = fs.readFileSync('/tmp/comment.md', 'utf8');
+
+            // Check if we already commented
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(comment => 
+              comment.user.type === 'Bot' && 
+              comment.body.includes('CRD Documentation Impact Analysis')
+            );
+
+            if (botComment) {
+              // Update existing comment
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: comment
+              });
+            } else {
+              // Create new comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: comment
+              });
+            }
+
+      - name: Handle No CRD Changes
+        if: steps.doc-check.outputs.has_results == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Check if there's an existing bot comment to clean up
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(comment => 
+              comment.user.type === 'Bot' && 
+              comment.body.includes('CRD Documentation Impact Analysis')
+            );
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: '✅ **CRD Documentation Check**: No CRD changes detected in this PR - no documentation analysis needed.'
+              });
+            }
+
+      - name: Upload Analysis Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: crd-analysis-logs
+          path: /tmp/crd-analysis.txt
+          retention-days: 7
