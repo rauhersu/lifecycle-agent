@@ -6,7 +6,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/liushuangls/go-anthropic/v2"
+	"github.com/anthropics/anthropic-sdk-go"
+	"github.com/anthropics/anthropic-sdk-go/option"
 )
 
 func main() {
@@ -18,8 +19,10 @@ func main() {
 		log.Fatal("ANTHROPIC_API_KEY environment variable is required. Please set it with your Anthropic API key.")
 	}
 
-	// Initialize Anthropic client (using official SDK due to LangChain model issues)
-	client := anthropic.NewClient(apiKey)
+	// Initialize Anthropic client using official SDK
+	client := anthropic.NewClient(
+		option.WithAPIKey(apiKey),
+	)
 
 	modifiedFile := "/home/rauherna/gorepo/lifecycle-agent.fork/api/imagebasedupgrade/v1/types.go"
 	docURL := "https://github.com/openshift/openshift-docs/tree/enterprise-4.19"
@@ -32,26 +35,27 @@ func main() {
 		docURL,
 	)
 
-//	prompt := "What would be a good company name for a company that makes colorful socks?"
+	//	prompt := "What would be a good company name for a company that makes colorful socks?"
 
 	fmt.Printf("Prompt: %s\n\n", prompt)
 	fmt.Println("Claude's response:")
 
-	// Create message request with Claude-3 Haiku model (tested and working)
-	request := anthropic.MessagesRequest{
-		Model: "claude-3-haiku-20240307",
-		Messages: []anthropic.Message{
-			anthropic.NewUserTextMessage(prompt),
-		},
+	// Create message request with Claude Sonnet 4 model
+	message, err := client.Messages.New(ctx, anthropic.MessageNewParams{
 		MaxTokens: 600,
-	}
-
-	// Send request to Anthropic
-	response, err := client.CreateMessages(ctx, request)
+		Messages: []anthropic.MessageParam{
+			anthropic.NewUserMessage(anthropic.NewTextBlock(prompt)),
+		},
+		Model: anthropic.ModelClaudeSonnet4_20250514,
+	})
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// Print the response
-	fmt.Println(response.Content[0].GetText())
+	for _, contentBlock := range message.Content {
+		if contentBlock.Type == "text" {
+			fmt.Println(contentBlock.Text)
+		}
+	}
 }
