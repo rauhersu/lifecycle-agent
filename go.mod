@@ -40,6 +40,7 @@ require (
 require (
 	cel.dev/expr v0.20.0 // indirect
 	github.com/BurntSushi/toml v1.5.0 // indirect
+	github.com/anthropics/anthropic-sdk-go v1.12.0 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.0 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/cavaliercoder/go-cpio v0.0.0-20180626203310-925f9528c45e // indirect
