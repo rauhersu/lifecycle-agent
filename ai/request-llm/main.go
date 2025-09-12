@@ -288,6 +288,50 @@ func getGitDiff() (string, error) {
 	// Get the repository root directory
 	repoRoot := "/home/rauherna/gorepo/lifecycle-agent.fork"
 
+	// Check if we're running in GitHub Actions
+	if os.Getenv("GITHUB_ACTIONS") == "true" {
+		return getGitDiffForGitHubActions(repoRoot)
+	}
+
+	// Original logic for local development
+	return getGitDiffLocal(repoRoot)
+}
+
+// getGitDiffForGitHubActions handles git diff in GitHub Actions context
+func getGitDiffForGitHubActions(repoRoot string) (string, error) {
+	// In GitHub Actions, we want to compare the current HEAD against the base branch
+	baseBranch := os.Getenv("GITHUB_BASE_REF") // e.g., "main"
+	if baseBranch == "" {
+		baseBranch = "main" // fallback
+	}
+
+	// Ensure we have the base branch reference
+	cmd := exec.Command("git", "fetch", "origin", baseBranch)
+	cmd.Dir = repoRoot
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("failed to fetch base branch %s: %w", baseBranch, err)
+	}
+
+	// Compare current HEAD against the base branch
+	baseRef := fmt.Sprintf("origin/%s", baseBranch)
+	cmd = exec.Command("git", "diff", baseRef, "HEAD")
+	cmd.Dir = repoRoot
+	output, err := cmd.Output()
+	if err != nil {
+		// Fallback: try without origin prefix
+		cmd = exec.Command("git", "diff", baseBranch, "HEAD")
+		cmd.Dir = repoRoot
+		output, err = cmd.Output()
+		if err != nil {
+			return "", fmt.Errorf("failed to run git diff against %s: %w", baseBranch, err)
+		}
+	}
+
+	return string(output), nil
+}
+
+// getGitDiffLocal handles git diff for local development
+func getGitDiffLocal(repoRoot string) (string, error) {
 	// Run git diff to get unstaged changes
 	cmd := exec.Command("git", "diff")
 	cmd.Dir = repoRoot
