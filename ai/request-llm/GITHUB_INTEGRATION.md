@@ -111,13 +111,30 @@ Based on the CRD changes showing "Rollback" to "RollbackTransaction" enum value 
 
 ## Local Testing
 
-You can run the analysis locally before creating a PR:
+You can run the analysis locally before creating a PR. The tool now automatically detects the git repository root and works from any directory:
 
+### Method 1: From ai/request-llm directory
 ```bash
 cd ai/request-llm
 export ANTHROPIC_API_KEY="your-api-key"
 go run main.go
 ```
+
+### Method 2: From project root (matches GitHub Actions)
+```bash
+cd /path/to/lifecycle-agent
+export ANTHROPIC_API_KEY="your-api-key"
+go run -mod=mod ai/request-llm/main.go
+```
+
+### Method 3: Using the test script (recommended)
+```bash
+cd ai/request-llm
+export ANTHROPIC_API_KEY="your-api-key"
+./test-workflow.sh
+```
+
+The test script validates both execution methods and simulates the GitHub Actions environment.
 
 This helps verify the analysis works correctly before triggering the workflow.
 
@@ -180,8 +197,11 @@ The workflow:
 
 ### No Results Posted (Most Common Issue)
 - **Root Cause**: The tool says "No changes detected in config/crd/bases/ directory" even though you modified CRD files
-- **Solution**: This was a git context issue that has been fixed. The tool now properly compares PR branches against their base branch
-- **Debugging**: Check the "Setup git for comparison" step in workflow logs to verify branch setup
+- **Solution**: This was a git context issue that has been fixed. The tool now:
+  - Properly compares PR branches against their base branch
+  - Dynamically finds the git repository root (no hardcoded paths)
+  - Works correctly when run from the project root (matches GitHub Actions)
+- **Debugging**: Check the "Setup git for comparison" step in workflow logs to verify branch setup and repository root detection
 
 ### Other Issues
 - Ensure the tool finds CRD changes in `config/crd/bases/`

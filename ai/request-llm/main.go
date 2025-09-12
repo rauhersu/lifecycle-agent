@@ -33,15 +33,16 @@ func filterGitDiffByCRD(gitDiff string) string {
 			// Check if this file is under config/crd/bases/
 			parts := strings.Split(line, " ")
 			if len(parts) >= 4 {
-				// Handle different git diff prefixes: a/, i/, etc.
+				// Handle different git diff prefixes: a/, b/, c/, i/, w/, etc.
 				file := parts[2]
 				if strings.Contains(file, "/") {
-					// Extract filename after the prefix (a/, i/, b/, w/, etc.)
+					// Extract filename after the prefix (a/, b/, c/, i/, w/, etc.)
 					slashIdx := strings.Index(file, "/")
 					if slashIdx >= 0 {
 						file = file[slashIdx+1:]
 					}
 				}
+
 				inRelevantFile = strings.HasPrefix(file, "config/crd/bases/")
 			}
 		}
@@ -97,10 +98,10 @@ func filterRelevantFiles(gitDiff string) []string {
 		if strings.HasPrefix(line, "diff --git") {
 			parts := strings.Split(line, " ")
 			if len(parts) >= 4 {
-				// Handle different git diff prefixes: a/, i/, etc.
+				// Handle different git diff prefixes: a/, b/, c/, i/, w/, etc.
 				file := parts[2]
 				if strings.Contains(file, "/") {
-					// Extract filename after the prefix (a/, i/, b/, w/, etc.)
+					// Extract filename after the prefix (a/, b/, c/, i/, w/, etc.)
 					slashIdx := strings.Index(file, "/")
 					if slashIdx >= 0 {
 						file = file[slashIdx+1:]
@@ -285,8 +286,11 @@ func extractSearchTermsFromDiff(gitDiff string, changedFiles []string) []string 
 
 // getGitDiff executes git diff and returns the output
 func getGitDiff() (string, error) {
-	// Get the repository root directory
-	repoRoot := "/home/rauherna/gorepo/lifecycle-agent.fork"
+	// Dynamically find the repository root directory
+	repoRoot, err := getGitRepoRoot()
+	if err != nil {
+		return "", fmt.Errorf("failed to find git repository root: %w", err)
+	}
 
 	// Check if we're running in GitHub Actions
 	if os.Getenv("GITHUB_ACTIONS") == "true" {
@@ -295,6 +299,22 @@ func getGitDiff() (string, error) {
 
 	// Original logic for local development
 	return getGitDiffLocal(repoRoot)
+}
+
+// getGitRepoRoot dynamically finds the git repository root directory
+func getGitRepoRoot() (string, error) {
+	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
+	output, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("failed to find git repository root: %w", err)
+	}
+
+	repoRoot := strings.TrimSpace(string(output))
+	if repoRoot == "" {
+		return "", fmt.Errorf("git repository root is empty")
+	}
+
+	return repoRoot, nil
 }
 
 // getGitDiffForGitHubActions handles git diff in GitHub Actions context
@@ -332,7 +352,9 @@ func getGitDiffForGitHubActions(repoRoot string) (string, error) {
 
 // getGitDiffLocal handles git diff for local development
 func getGitDiffLocal(repoRoot string) (string, error) {
-	// Run git diff to get unstaged changes
+	var allDiffs []string
+
+	// Get unstaged changes
 	cmd := exec.Command("git", "diff")
 	cmd.Dir = repoRoot
 	output, err := cmd.Output()
@@ -340,21 +362,26 @@ func getGitDiffLocal(repoRoot string) (string, error) {
 		return "", fmt.Errorf("failed to run git diff: %w", err)
 	}
 
-	diff := string(output)
-
-	// If no unstaged changes, try staged changes
-	if strings.TrimSpace(diff) == "" {
-		cmd = exec.Command("git", "diff", "--cached")
-		cmd.Dir = repoRoot
-		output, err = cmd.Output()
-		if err != nil {
-			return "", fmt.Errorf("failed to run git diff --cached: %w", err)
-		}
-		diff = string(output)
+	unstagedDiff := strings.TrimSpace(string(output))
+	if unstagedDiff != "" {
+		allDiffs = append(allDiffs, unstagedDiff)
 	}
 
-	// If still no changes, try comparing with origin/main
-	if strings.TrimSpace(diff) == "" {
+	// Get staged changes
+	cmd = exec.Command("git", "diff", "--cached")
+	cmd.Dir = repoRoot
+	output, err = cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("failed to run git diff --cached: %w", err)
+	}
+
+	stagedDiff := strings.TrimSpace(string(output))
+	if stagedDiff != "" {
+		allDiffs = append(allDiffs, stagedDiff)
+	}
+
+	// If no local changes, try comparing with origin/main
+	if len(allDiffs) == 0 {
 		cmd = exec.Command("git", "diff", "origin/main", "HEAD")
 		cmd.Dir = repoRoot
 		output, err = cmd.Output()
@@ -367,10 +394,16 @@ func getGitDiffLocal(repoRoot string) (string, error) {
 				return "", fmt.Errorf("failed to run git diff against main: %w", err)
 			}
 		}
-		diff = string(output)
+		commitDiff := strings.TrimSpace(string(output))
+		if commitDiff != "" {
+			allDiffs = append(allDiffs, commitDiff)
+		}
 	}
 
-	return diff, nil
+	// Combine all diffs
+	combinedDiff := strings.Join(allDiffs, "\n")
+
+	return combinedDiff, nil
 }
 
 func main() {
