@@ -47,7 +47,7 @@ jobs:
         run: |
           cd ai/request-llm
           go mod tidy
-
+          
       - name: Run CRD Documentation Analysis
         id: doc-check
         env:
@@ -55,11 +55,13 @@ jobs:
           GITHUB_ACTIONS: true
           GITHUB_BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: |
-          cd ai/request-llm
-
+          # Run from project root so tool can find repository structure
+          echo "Repository root: $(pwd)"
+          echo "Git repository root: $(git rev-parse --show-toplevel)"
+          
           # Capture the output and exit code
           set +e
-          output=$(go run main.go 2>&1)
+          output=$(go run -mod=mod ai/request-llm/main.go 2>&1)
           exit_code=$?
           set -e
 

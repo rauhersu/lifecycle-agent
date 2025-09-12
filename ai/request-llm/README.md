@@ -32,6 +32,14 @@ export ANTHROPIC_API_KEY="your-api-key"
 ./test-workflow.sh
 ```
 
+**Note:** The tool now automatically detects the git repository root, so it works from any directory. However, for GitHub Actions compatibility, it's recommended to run from the project root:
+
+```bash
+# From project root (matches GitHub Actions)
+export ANTHROPIC_API_KEY="your-api-key"
+go run -mod=mod ai/request-llm/main.go
+```
+
 ## 🛠️ What This Tool Does
 
 This project demonstrates advanced integration between git analysis, AI processing, and documentation management. It was originally intended to use LangChainGo, but we discovered model identifier compatibility issues. The official Anthropic SDK provides more reliable access to Claude models.
