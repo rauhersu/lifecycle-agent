@@ -108,15 +108,15 @@ jobs:
             fi
 
             # Extract Claude's specific recommendations
-            if grep -A 50 "Claude's response:" "$analysis_file" | grep -B 50 "SUMMARY -" | head -n -1 > /tmp/recommendations.txt; then
+            if sed -n '/Claude'\''s response:/,/^========\|^SUMMARY/p' "$analysis_file" | head -n -1 > /tmp/recommendations.txt && [[ -s /tmp/recommendations.txt ]]; then
               echo "🤖 **AI Analysis Results:**" >> /tmp/comment.md
               echo "" >> /tmp/comment.md
-              echo '```' >> /tmp/comment.md
-              head -n 30 /tmp/recommendations.txt >> /tmp/comment.md
-              if [[ $(wc -l < /tmp/recommendations.txt) -gt 30 ]]; then
-                echo "... (truncated for readability)" >> /tmp/comment.md
+              # Skip the "Claude's response:" line and add the actual analysis
+              tail -n +2 /tmp/recommendations.txt | head -n 50 >> /tmp/comment.md
+              if [[ $(wc -l < /tmp/recommendations.txt) -gt 52 ]]; then
+                echo "" >> /tmp/comment.md
+                echo "*... (analysis truncated for readability)*" >> /tmp/comment.md
               fi
-              echo '```' >> /tmp/comment.md
               echo "" >> /tmp/comment.md
             fi
 
