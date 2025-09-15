@@ -46,7 +46,7 @@ type SeedGeneratorSpec struct {
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:Pattern="^([a-z0-9]+://)?[\\S]+$"
 	// SeedImage defines the full pull-spec of the seed container image to be created.
-	SeedImage string `json:"seedImage,omitempty"`
+	SeedNewImage string `json:"seedNewImage,omitempty"`
 
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
 	// +kubebuilder:validation:MinLength=1
