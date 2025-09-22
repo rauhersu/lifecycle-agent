@@ -42,7 +42,15 @@ go run -mod=mod ai/request-llm/main.go
 
 ## 🛠️ What This Tool Does
 
-This project demonstrates advanced integration between git analysis, AI processing, and documentation management. It was originally intended to use LangChainGo, but we discovered model identifier compatibility issues. The official Anthropic SDK provides more reliable access to Claude models.
+This project provides intelligent analysis of Custom Resource Definition (CRD) changes and their impact on OpenShift documentation. The tool automatically:
+
+1. **Detects CRD Changes**: Monitors git diff for changes in `config/crd/bases/` directory
+2. **Downloads Documentation**: Clones the OpenShift docs repository for comprehensive analysis
+3. **Intelligent Search**: Uses sophisticated algorithms to find relevant documentation files
+4. **AI Analysis**: Leverages Claude Sonnet 4 to provide specific, actionable recommendations
+5. **Verified Results**: Returns only real, existing documentation URLs that need updates
+
+The tool bridges the gap between code changes and documentation maintenance, ensuring CRD modifications are properly reflected in user-facing documentation.
 
 ## Prerequisites
 
@@ -57,7 +65,7 @@ To use this project, you'll need to get an Anthropic API key:
 2. **Create an account**: Use your email to sign up for an account
 3. **Verify your account**: Check your email and verify your account
 4. **Add billing information**: You'll need to add payment information to use the API
-5. **Generate API key**: 
+5. **Generate API key**:
    - Go to your account settings or API keys section
    - Click "Create Key" or similar
    - Copy the generated key (it will start with `sk-ant-`)
@@ -67,35 +75,40 @@ To use this project, you'll need to get an Anthropic API key:
 
 ## Setup Instructions
 
-1. **Clone/Initialize the project**:
+1. **Navigate to the project directory**:
+
    ```bash
-   cd /home/rauherna/gorepo/request-llm
+   cd ai/request-llm
    ```
 
 2. **Install dependencies**:
+
    ```bash
    go mod tidy
    ```
 
 3. **Set your API key**:
+
    ```bash
    export ANTHROPIC_API_KEY="your-api-key-here"
    ```
-   
+
    Or add it to your shell profile (`.bashrc`, `.zshrc`, etc.):
+
    ```bash
    echo 'export ANTHROPIC_API_KEY="your-api-key-here"' >> ~/.bashrc
    source ~/.bashrc
    ```
 
 4. **Run the application**:
+
    ```bash
    go run main.go
    ```
 
 ## Project Structure
 
-```
+```text
 request-llm/
 ├── main.go          # Main application file
 ├── go.mod          # Go module dependencies
@@ -106,129 +119,49 @@ request-llm/
 ## Code Overview
 
 The project uses:
+
 - **Official Anthropic Go SDK**: Direct integration with Anthropic's API
-- **Claude 3 Haiku**: Currently working model (fast and cost-effective)
+- **Claude Sonnet 4**: Advanced model for comprehensive CRD analysis
+- **Git integration**: Automatically detects CRD changes via git diff
+- **OpenShift docs cloning**: Downloads and searches official documentation
 - **Environment variables**: For secure API key management
 
 The main application:
+
 1. Reads the API key from the `ANTHROPIC_API_KEY` environment variable
-2. Initializes the Anthropic client using the official SDK
-3. Creates a message request with the specified model
-4. Sends a prompt asking for creative company names
-5. Displays Claude's AI-generated response
+2. Detects CRD changes by analyzing git diff in `config/crd/bases/` directory
+3. Clones the OpenShift documentation repository for comprehensive search
+4. Extracts relevant search terms from CRD changes
+5. Searches documentation files for CRD-specific content (API references, schemas, field descriptions)
+6. Uses Claude Sonnet 4 to analyze changes and provide specific documentation update recommendations
+7. Returns verified URLs of documentation files that need updates
 
 ## Model Information
 
-This project currently uses `claude-3-haiku-20240307`, which is:
-- A fast and cost-effective Claude model
-- Good for most conversational tasks
-- Well-established and reliable
+This project currently uses `claude-sonnet-4-20250514` (Claude Sonnet 4), which is:
 
-You can change the model by modifying the `Model` field in the `MessagesRequest` in `main.go`.
-
-## Available Claude Models
-
-**Currently Working Models:**
-- `claude-3-haiku-20240307` - Fast and cost-effective (currently used)
-
-**Other Models to Try:**
-- `claude-3-opus-20240229` - Most capable Claude-3 model, highest cost
-- `claude-3-sonnet-20240229` - Balanced performance and cost
-- `claude-3-5-sonnet-20240620` - Newer Sonnet model (may require higher API tier)
-
-**⚠️ Important Notes:**
-- Model availability depends on your Anthropic API tier and account status
-- Some models may return 404 errors if not available for your account
-- Check [Anthropic's documentation](https://docs.anthropic.com/claude/docs/models-overview) for current model availability
-- Claude-4 models may be available but identifiers are still unclear
-
-## Testing Results - What We Tried
-
-During development, we tested both LangChainGo and the official Anthropic SDK with various models:
-
-### LangChain Issues ❌
-- **LangChainGo**: Returned 404 errors for ALL models we tested including:
-  - `claude-3-sonnet-20240229`
-  - `claude-3-opus-20240229`
-  - `claude-3-5-sonnet-20240620`
-  - `claude-instant-1.2`
-- **Conclusion**: LangChainGo appears to have model identifier compatibility issues
-
-### Official Anthropic SDK Results ✅❌
-- ✅ **claude-3-haiku-20240307**: ✨ **WORKS PERFECTLY**
-- ❌ **claude-3-opus-20240229**: Returns 404 error (likely requires higher API tier)
-- ❌ **claude-3-sonnet-20240229**: Returns 404 error (may require higher API tier)
-- ❌ **claude-3-5-sonnet-20240620**: Returns 404 error (may require higher API tier)
-
-### Key Findings
-1. **Official SDK > LangChain**: The official Anthropic SDK is more reliable than LangChain for Claude integration
-2. **Model Tiers**: Higher-performance models (Opus, Sonnet) may require paid API tiers
-3. **Haiku Works**: Claude-3 Haiku is accessible with basic API access and works great
-4. **Account Dependent**: Model access varies by account type and payment status
-
-## How to Upgrade to Newer Models
-
-To try newer models like Claude 3.5 Sonnet:
-
-1. **Update the model in `main.go`:**
-   ```go
-   Model: "claude-3-5-sonnet-20240620", // Try this identifier
-   ```
-
-2. **Check your API access:** Some models require higher API tiers
-
-3. **Handle errors gracefully:** Add fallback models if newer ones aren't available
+- Anthropic's most advanced model for complex analysis tasks
+- Excellent for technical documentation analysis and recommendations
+- Optimized for understanding code changes and their implications
+- Well-suited for CRD analysis and documentation correlation
 
 ## Customization
 
-To modify the prompt, edit the `prompt` variable in `main.go`:
+The tool automatically generates detailed prompts for CRD analysis. The main prompt is dynamically constructed in `main.go` based on:
 
-```go
-prompt := "Your custom prompt here"
-```
+- Detected CRD changes in `config/crd/bases/`
+- Found documentation files in OpenShift docs
+- Git diff analysis and search terms
 
-## Error Handling
+You can customize the analysis by modifying:
 
-The application includes basic error handling for:
-- Missing API key
-- LLM initialization failures
-- API call failures
+- Search directories in the `targetDirs` variable
+- Search terms extraction logic in `extractSearchTermsFromDiff()`
+- Maximum number of documentation files analyzed
+- Token limits and truncation thresholds
 
-## Security Notes
-
-- Never hardcode your API key in the source code
-- Use environment variables for sensitive configuration
-- Consider using a `.env` file for local development (but don't commit it!)
-- Rotate your API keys regularly
-
-## Troubleshooting
-
-**"ANTHROPIC_API_KEY environment variable is required"**
-- Make sure you've set the environment variable correctly
-- Check that you're using the correct variable name
-- Restart your terminal after setting the variable
-
-**API errors**:
-- Verify your API key is correct and active
-- Check your Anthropic account has sufficient credits
-- Ensure you have proper billing set up
-
-**Go module errors**:
-- Run `go mod tidy` to ensure dependencies are properly installed
-- Make sure you're using Go 1.21 or higher
-
-## Next Steps
-
-This is a basic example. You can extend it by:
-- Adding conversation history
-- Implementing streaming responses
-- Adding different prompt templates
-- Creating a web API wrapper
-- Adding configuration files
-- Implementing retry logic with exponential backoff
 
 ## Resources
 
-- [LangChainGo Documentation](https://tmc.github.io/langchaingo/)
 - [Anthropic API Documentation](https://docs.anthropic.com/)
 - [Claude Models Guide](https://docs.anthropic.com/claude/docs/models-overview)
